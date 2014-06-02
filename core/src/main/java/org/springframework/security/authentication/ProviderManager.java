@@ -27,6 +27,7 @@ import org.springframework.security.core.CredentialsContainer;
 import org.springframework.security.core.SpringSecurityMessageSource;
 import org.springframework.util.Assert;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -119,6 +120,17 @@ public class ProviderManager implements AuthenticationManager, MessageSourceAwar
         }
     }
 
+    private static class AuthenticationExceptionDto{
+
+        public final AuthenticationException exception;
+        public final String provider;
+
+        private AuthenticationExceptionDto(AuthenticationException exception, String provider) {
+            this.exception = exception;
+            this.provider = provider;
+        }
+    }
+
     /**
      * Attempts to authenticate the passed {@link Authentication} object.
      * <p>
@@ -139,7 +151,7 @@ public class ProviderManager implements AuthenticationManager, MessageSourceAwar
      */
     public Authentication authenticate(Authentication authentication) throws AuthenticationException {
         Class<? extends Authentication> toTest = authentication.getClass();
-        AuthenticationException lastException = null;
+        final List<AuthenticationExceptionDto> exceptions = new ArrayList<AuthenticationExceptionDto>();
         Authentication result = null;
         boolean debug = logger.isDebugEnabled();
 
@@ -164,7 +176,7 @@ public class ProviderManager implements AuthenticationManager, MessageSourceAwar
                 // SEC-546: Avoid polling additional providers if auth failure is due to invalid account status
                 throw e;
             } catch (AuthenticationException e) {
-                lastException = e;
+                exceptions.add(new AuthenticationExceptionDto(e, provider.getClass().getName()));
             }
         }
 
@@ -176,7 +188,7 @@ public class ProviderManager implements AuthenticationManager, MessageSourceAwar
                 // ignore as we will throw below if no other exception occurred prior to calling parent and the parent
                 // may throw ProviderNotFound even though a provider in the child already handled the request
             } catch (AuthenticationException e) {
-                lastException = e;
+                exceptions.add(new AuthenticationExceptionDto(e, parent.getClass().getName()));
             }
         }
 
@@ -192,9 +204,16 @@ public class ProviderManager implements AuthenticationManager, MessageSourceAwar
 
         // Parent was null, or didn't authenticate (or throw an exception).
 
-        if (lastException == null) {
+        AuthenticationException lastException = null;
+
+        if (exceptions.isEmpty()) {
             lastException = new ProviderNotFoundException(messages.getMessage("ProviderManager.providerNotFound",
-                        new Object[] {toTest.getName()}, "No AuthenticationProvider found for {0}"));
+                    new Object[]{toTest.getName()}, "No AuthenticationProvider found for {0}"));
+        } else{
+            for (AuthenticationExceptionDto each : exceptions) {
+                logger.info("Error during authentication attempt using " + each.provider+". Access is denied", each.exception);
+                lastException = each.exception;
+            }
         }
 
         prepareException(lastException, authentication);

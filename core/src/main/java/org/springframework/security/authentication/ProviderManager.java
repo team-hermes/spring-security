@@ -15,9 +15,6 @@
 
 package org.springframework.security.authentication;
 
-import java.util.Collections;
-import java.util.List;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.factory.InitializingBean;
@@ -29,6 +26,9 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.CredentialsContainer;
 import org.springframework.security.core.SpringSecurityMessageSource;
 import org.springframework.util.Assert;
+
+import java.util.Collections;
+import java.util.List;
 
 
 /**
@@ -162,9 +162,6 @@ public class ProviderManager implements AuthenticationManager, MessageSourceAwar
             } catch (AccountStatusException e) {
                 prepareException(e, authentication);
                 // SEC-546: Avoid polling additional providers if auth failure is due to invalid account status
-                throw e;
-            } catch (InternalAuthenticationServiceException e) {
-                prepareException(e, authentication);
                 throw e;
             } catch (AuthenticationException e) {
                 lastException = e;
